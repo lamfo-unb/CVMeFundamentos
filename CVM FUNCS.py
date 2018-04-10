@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sat Aug 19 12:06:57 2017
-
 @author: pedro
 Funcoes de WS cvm
 """
@@ -12,6 +11,7 @@ import requests, io
 import xmltodict, json
 import pymongo
 import datetime
+import csv
 
 #
 #def OpenXML_UNICO(URL):
@@ -20,6 +20,12 @@ import datetime
 #    x=zf.namelist()[0]
 #    soup = BeautifulSoup(str(zf.read(x).decode('UTF-8')), 'html.parser')
 #    return(soup)
+
+def PercorreCSV():
+    global logins,lg,pw
+    credencial = next(logins)
+    lg=credencial[0]
+    pw=credencial[1]
 
 def OpenXML_JSON(URL):
     r = requests.get(URL, stream=True)
@@ -42,26 +48,36 @@ def LoginCVM(wsdl,lg,pw):
 #---------------------Funcoes de dados primordiais dos fundos ----------------------------------------------------------
 ##                  lista de fundos.
 def solicAutorizDownloadCadastroCVM(response_header,client,data):
-    # -- Retorna arquivo com dados diarios de fundos cadastrados. 
-    result_func = client.service.solicAutorizDownloadCadastro(
-                        _soapheaders=[response_header],
-                        strDtRefer=data,
-                        strMotivoAutorizDownload="Motivos de estudo", 
-                    )
-    return(result_func.body.solicAutorizDownloadCadastroResult)
+    # -- Retorna arquivo com dados diarios de fundos cadastrados.
+    try:
+        result_func = client.service.solicAutorizDownloadCadastro(
+                            _soapheaders=[response_header],
+                            strDtRefer=data,
+                            strMotivoAutorizDownload="Motivos de estudo", 
+                        )
+        status = 1
+    except:
+        status = 0
+        return(0,status)
+    return(result_func.body.solicAutorizDownloadCadastroResult,status)
 
 ##------- Dados de informacoes diarias, atualizacao.
 def solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo):
     ## --- captura diariamente as informacoes publicas.
     num= 50 if 'b' in arquivo else 209
-    result_func = client.service.solicAutorizDownloadArqEntregaPorData(
-                        _soapheaders=[response_header],
-    #                    iCdTpDoc = 209,
-                        iCdTpDoc = num,
-                        strDtEntregaDoc=data,
-                        strMotivoAutorizDownload="Motivos de estudo", 
-                    )
-    return(result_func.body.solicAutorizDownloadArqEntregaPorDataResult)
+    try:
+        result_func = client.service.solicAutorizDownloadArqEntregaPorData(
+                            _soapheaders=[response_header],
+        #                    iCdTpDoc = 209,
+                            iCdTpDoc = num,
+                            strDtEntregaDoc=data,
+                            strMotivoAutorizDownload="Motivos de estudo", 
+                        )
+        status = 1
+    except:
+        status = 0
+        return(0,status)
+    return(result_func.body.solicAutorizDownloadArqEntregaPorDataResult,status)
 
 ### ----------------------- BANCO MONGO
 # -------------            CONEXÃO COM O BANCO
@@ -74,17 +90,23 @@ cvmdb= db.cvm
 ### -------------------------   TESTES
 ### ----------------------- teste otimizacao 
 # -------------            cadastro de fundos 
+login_file = open('mycsvfileRene.csv', 'r')
+logins = csv.reader(login_file)
+
 wsdl = 'http://sistemas.cvm.gov.br/webservices/Sistemas/SCW/CDocs/WsDownloadInfs.asmx?WSDL'
-lg='1906'
-pw='4590'
+lg=''
+pw=''
+PercorreCSV()
+response_header,client=LoginCVM(wsdl,lg,pw)
 
-data="2017-08-18"
-import datetime 
-
-for data in [((datetime.date.today() - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(2500) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 0)]:
-    
-    response_header,client=LoginCVM(wsdl,lg,pw)
-    result_func=solicAutorizDownloadCadastroCVM(response_header,client,data)
+for data in [((datetime.date.today() - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(2,2500) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
+    status = 0
+    while status == 0:
+        result_func,status=solicAutorizDownloadCadastroCVM(response_header,client,data)
+        if status == 0:
+            print("teste")
+            PercorreCSV()
+            response_header,client=LoginCVM(wsdl,lg,pw)
     ## json formater, cadastro
     Jcadas=OpenXML_JSON(result_func)
     Fundos={}
@@ -153,9 +175,15 @@ for data in [((datetime.date.today() - datetime.timedelta(days=x)).strftime('%Y-
     
     
     #----------------- Dados diarios.
-    response_header,client=LoginCVM(wsdl,lg,pw)
     arquivo='d'
-    result_func=solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo)
+    
+    status = 0
+    while status == 0:
+        result_func,status=solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo)
+        if status == 0:
+            PercorreCSV()
+            response_header,client=LoginCVM(wsdl,lg,pw)
+            
     Jcadas=OpenXML_JSON(result_func)
     # dado diario
     Diario={}
@@ -175,9 +203,15 @@ for data in [((datetime.date.today() - datetime.timedelta(days=x)).strftime('%Y-
         cvmdb.update_one({'_id': diariojson["_id"]}, {'$push': {'diario': diariojson["diario"][0]}})
     
     #----------------- Dados balanco.
-    response_header,client=LoginCVM(wsdl,lg,pw)
     arquivo='b'
-    result_func=solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo)
+    
+    status = 0
+    while status == 0:
+        result_func=solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo)
+        if status == 0:
+            PercorreCSV()
+            response_header,client=LoginCVM(wsdl,lg,pw)
+    
     Jcadas=OpenXML_JSON(result_func)
     
     # dado diario
@@ -199,5 +233,3 @@ for data in [((datetime.date.today() - datetime.timedelta(days=x)).strftime('%Y-
     ### ---------------------- Desenvolver coleta e carga de historico/ 
 
 #Fundos[list(Fundos.keys())[10]]
-
-
