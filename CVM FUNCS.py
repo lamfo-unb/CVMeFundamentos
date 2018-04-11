@@ -56,9 +56,17 @@ def solicAutorizDownloadCadastroCVM(response_header,client,data):
                             strMotivoAutorizDownload="Motivos de estudo", 
                         )
         status = 1
-    except:
-        status = 0
-        return(0,status)
+    except Exception as e:
+        exce=e.args
+        if exce[0] == 'Arquivo para download não encontrado para os parâmetros especificados':
+            status = 2
+            return(0,status)
+        elif exce[0] == 'Conversão do parâmetro strDtRefer para data não retorna dia útil':
+            status = 2
+            return(0,status)
+        elif exce[0] == 'Permissão negada. Por favor, efetue o login antes de acessar essa funcionalidade.':
+            status = 0
+            return(0,status)
     return(result_func.body.solicAutorizDownloadCadastroResult,status)
 
 ##------- Dados de informacoes diarias, atualizacao.
@@ -101,12 +109,16 @@ response_header,client=LoginCVM(wsdl,lg,pw)
 
 for data in [((datetime.date.today() - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(2,2500) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
     status = 0
-    while status == 0:
+    while status > 0:
         result_func,status=solicAutorizDownloadCadastroCVM(response_header,client,data)
         if status == 0:
             print("teste")
             PercorreCSV()
             response_header,client=LoginCVM(wsdl,lg,pw)
+    
+    if status == 2:
+        break
+    print(data)
     ## json formater, cadastro
     Jcadas=OpenXML_JSON(result_func)
     Fundos={}
