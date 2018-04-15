@@ -67,6 +67,9 @@ def solicAutorizDownloadCadastroCVM(response_header,client,data):
         elif exce[0] == 'Permissão negada. Por favor, efetue o login antes de acessar essa funcionalidade.':
             status = 0
             return(0,status)
+        elif exce[0] == 'Usuário atingiu o número máximo de autorizações para download permitido. Autorização não concedida.':
+            status = 0
+            return(0,status)
     return(result_func.body.solicAutorizDownloadCadastroResult,status)
 
 ##------- Dados de informacoes diarias, atualizacao.
@@ -93,6 +96,9 @@ def solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo
         elif exce[0] == 'Permissão negada. Por favor, efetue o login antes de acessar essa funcionalidade.':
             status = 0
             return(0,status)
+        elif exce[0] == 'Usuário atingiu o número máximo de autorizações para download permitido. Autorização não concedida.':
+            status = 0
+            return(0,status)
     return(result_func.body.solicAutorizDownloadArqEntregaPorDataResult,status)
 
 ### ----------------------- BANCO MONGO
@@ -106,7 +112,7 @@ cvmdb= db.cvm
 ### -------------------------   TESTES
 ### ----------------------- teste otimizacao 
 # -------------            cadastro de fundos 
-login_file = open('mycsvfileRene.csv', 'r')
+login_file = open('C:/Users/paulo/Documents/python-code/CVM/mycsvfileRene.csv', 'r')
 logins = csv.reader(login_file)
 
 wsdl = 'http://sistemas.cvm.gov.br/webservices/Sistemas/SCW/CDocs/WsDownloadInfs.asmx?WSDL'
@@ -116,7 +122,7 @@ PercorreCSV()
 response_header,client=LoginCVM(wsdl,lg,pw)
 dia0=datetime.date.today()
 
-for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(0,5800,-1) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
+for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(5800,0,-1) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
     status = 0
     while status == 0:
         result_func,status=solicAutorizDownloadCadastroCVM(response_header,client,data)
@@ -209,12 +215,10 @@ for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in
         Diario={}
         ## Dados do fundo.
         for c in range(len(Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"])):
-            if Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","") in Fundos.keys():
-                Diario.update({Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""):{Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["DT_COMPTC"]:Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]}})
-                Fundos[Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")]["Diario"].update(Diario[Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")])
-                
+  
             diariojson= {}
             diariojson={"_id":Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""), "diario":[]}
+            cvmdb.update_one({'_id': diariojson["_id"]}, {'$set':diariojson}, upsert=True)
             
             DT_REF = datetime.datetime.strptime(Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["DT_COMPTC"], '%Y-%m-%d')
             
@@ -245,6 +249,7 @@ for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in
                 
             balancojson= {}
             balancojson={"_id":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""), "balanco":[]}
+            cvmdb.update_one({'_id': balancojson["_id"]}, {'$set':balancojson}, upsert=True)
             
             DT_REF = datetime.datetime.strptime(Jcadas["ROOT"]["CABECALHO"]["DT_REFER"], '%Y-%m-%d')
             
