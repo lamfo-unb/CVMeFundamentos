@@ -82,9 +82,17 @@ def solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo
                             strMotivoAutorizDownload="Motivos de estudo", 
                         )
         status = 1
-    except:
-        status = 0
-        return(0,status)
+    except Exception as e:
+        exce=e.args
+        if exce[0] == 'Arquivo para download não encontrado para os parâmetros especificados':
+            status = 2
+            return(0,status)
+        elif exce[0] == 'Conversão do parâmetro strDtRefer para data não retorna dia útil.':
+            status = 2
+            return(0,status)
+        elif exce[0] == 'Permissão negada. Por favor, efetue o login antes de acessar essa funcionalidade.':
+            status = 0
+            return(0,status)
     return(result_func.body.solicAutorizDownloadArqEntregaPorDataResult,status)
 
 ### ----------------------- BANCO MONGO
@@ -117,76 +125,74 @@ for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in
             PercorreCSV()
             response_header,client=LoginCVM(wsdl,lg,pw)
     
-    if status == 2:
-        break
-    print(data)
-    ## json formater, cadastro
-    Jcadas=OpenXML_JSON(result_func)
-    Fundos={}
-    ## Dados do fundo.
-    for c in range(len(Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"])):
-       Fundos.update({Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]["CNPJ"].replace(".","").replace("/","").replace("-",""):{"Cadastro":{Jcadas["ROOT"]["CABECALHO"]["DT_REFER"]:Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]}}})
-       Fundos[Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]["CNPJ"].replace(".","").replace("/","").replace("-","")].update({"Diario":{},"Balanco":{}})
-       
-       fundojson= {}
-       fundojson={"_id":Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]["CNPJ"].replace(".","").replace("/","").replace("-","")}
-       cvmdb.update_one({'_id': fundojson["_id"]}, {'$set':fundojson}, upsert=True)
-       
-       DT_REF = datetime.datetime.strptime(Jcadas["ROOT"]["CABECALHO"]["DT_REFER"], '%Y-%m-%d')
-       
-       fundojson.update({"cadastro":[]})   
-       fundojson["cadastro"].append({'DT_REFER': DT_REF, 'info': Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]})
-       
-       CursorUpdateInfoPrev = cvmdb.aggregate([
-                            {"$unwind": "$cadastro"},
-                            {"$match": {"_id": fundojson["_id"], "cadastro.DT_REFER": {"$lte": DT_REF}}},         
-                            {"$project": 
-                                {"cadastro.DT_REFER": 1, 
-                                    "cadastro.info": 
-                                    {"$cond": 
-                                        {"if": {"$eq": ["$cadastro.info", fundojson['cadastro'][0]['info']]},
-                                            "then": 1,
-                                            "else": 0
+    if status == 1:
+        ## json formater, cadastro
+        Jcadas=OpenXML_JSON(result_func)
+        Fundos={}
+        ## Dados do fundo.
+        for c in range(len(Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"])):
+           Fundos.update({Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]["CNPJ"].replace(".","").replace("/","").replace("-",""):{"Cadastro":{Jcadas["ROOT"]["CABECALHO"]["DT_REFER"]:Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]}}})
+           Fundos[Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]["CNPJ"].replace(".","").replace("/","").replace("-","")].update({"Diario":{},"Balanco":{}})
+           
+           fundojson= {}
+           fundojson={"_id":Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]["CNPJ"].replace(".","").replace("/","").replace("-","")}
+           cvmdb.update_one({'_id': fundojson["_id"]}, {'$set':fundojson}, upsert=True)
+           
+           DT_REF = datetime.datetime.strptime(Jcadas["ROOT"]["CABECALHO"]["DT_REFER"], '%Y-%m-%d')
+           
+           fundojson.update({"cadastro":[]})   
+           fundojson["cadastro"].append({'DT_REFER': DT_REF, 'info': Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]})
+           
+           CursorUpdateInfoPrev = cvmdb.aggregate([
+                                {"$unwind": "$cadastro"},
+                                {"$match": {"_id": fundojson["_id"], "cadastro.DT_REFER": {"$lte": DT_REF}}},         
+                                {"$project": 
+                                    {"cadastro.DT_REFER": 1, 
+                                        "cadastro.info": 
+                                        {"$cond": 
+                                            {"if": {"$eq": ["$cadastro.info", fundojson['cadastro'][0]['info']]},
+                                                "then": 1,
+                                                "else": 0
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            {"$sort": {"cadastro.DT_REFER": -1}},
-                            {"$limit": 1}
-                        ])
-    
-       aux = 0
-       for j in CursorUpdateInfoPrev:
-           aux = 1
-           if j["cadastro"]["info"] == 0: 
+                                },
+                                {"$sort": {"cadastro.DT_REFER": -1}},
+                                {"$limit": 1}
+                            ])
+        
+           aux = 0
+           for j in CursorUpdateInfoPrev:
+               aux = 1
+               if j["cadastro"]["info"] == 0: 
+                   cvmdb.update_one({'_id': fundojson["_id"]}, {'$push': {'cadastro': fundojson["cadastro"][0]}})
+            
+           if aux == 0:
                cvmdb.update_one({'_id': fundojson["_id"]}, {'$push': {'cadastro': fundojson["cadastro"][0]}})
-        
-       if aux == 0:
-           cvmdb.update_one({'_id': fundojson["_id"]}, {'$push': {'cadastro': fundojson["cadastro"][0]}})
-               
-       CursorUpdateInfoNext = list(cvmdb.aggregate([
-                           {"$unwind": "$cadastro"},
-                            {"$match": {"_id": fundojson["_id"], "cadastro.DT_REFER": {"$gt": DT_REF}}},         
-                            {"$project": 
-                                {"cadastro.DT_REFER": 1, 
-                                    "cadastro.info": 
-                                    {"$cond": 
-                                        {"if": {"$eq": ["$cadastro.info", fundojson['cadastro'][0]['info']]},
-                                            "then": 1,
-                                            "else": 0
+                   
+           CursorUpdateInfoNext = list(cvmdb.aggregate([
+                               {"$unwind": "$cadastro"},
+                                {"$match": {"_id": fundojson["_id"], "cadastro.DT_REFER": {"$gt": DT_REF}}},         
+                                {"$project": 
+                                    {"cadastro.DT_REFER": 1, 
+                                        "cadastro.info": 
+                                        {"$cond": 
+                                            {"if": {"$eq": ["$cadastro.info", fundojson['cadastro'][0]['info']]},
+                                                "then": 1,
+                                                "else": 0
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            {"$sort": {"cadastro.DT_REFER": 1}},
-                            {"$limit": 1}
-                        ]))
+                                },
+                                {"$sort": {"cadastro.DT_REFER": 1}},
+                                {"$limit": 1}
+                            ]))
+            
+           for i in CursorUpdateInfoNext:
+              if i["cadastro"]["info"] == 1:
+                 cvmdb.update_one({'_id': fundojson["_id"]}, {'$pull': {'cadastro': {'DT_REFER': i["cadastro"]["DT_REFER"], 'info': fundojson['cadastro'][0]['info']}}})
         
-       for i in CursorUpdateInfoNext:
-          if i["cadastro"]["info"] == 1:
-             cvmdb.update_one({'_id': fundojson["_id"]}, {'$pull': {'cadastro': {'DT_REFER': i["cadastro"]["DT_REFER"], 'info': fundojson['cadastro'][0]['info']}}})
-    
-    
+        
     #----------------- Dados diarios.
     arquivo='d'
     
@@ -197,23 +203,24 @@ for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in
             PercorreCSV()
             response_header,client=LoginCVM(wsdl,lg,pw)
             
-    Jcadas=OpenXML_JSON(result_func)
-    # dado diario
-    Diario={}
-    ## Dados do fundo.
-    for c in range(len(Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"])):
-        if Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","") in Fundos.keys():
-            Diario.update({Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""):{Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["DT_COMPTC"]:Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]}})
-            Fundos[Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")]["Diario"].update(Diario[Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")])
+    if status == 1:       
+        Jcadas=OpenXML_JSON(result_func)
+        # dado diario
+        Diario={}
+        ## Dados do fundo.
+        for c in range(len(Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"])):
+            if Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","") in Fundos.keys():
+                Diario.update({Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""):{Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["DT_COMPTC"]:Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]}})
+                Fundos[Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")]["Diario"].update(Diario[Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")])
+                
+            diariojson= {}
+            diariojson={"_id":Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""), "diario":[]}
             
-        diariojson= {}
-        diariojson={"_id":Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""), "diario":[]}
-        
-        DT_REF = datetime.datetime.strptime(Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["DT_COMPTC"], '%Y-%m-%d')
-        
-        diariojson["diario"].append({'DT_REFER': DT_REF, 'info': Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]})
-       
-        cvmdb.update_one({'_id': diariojson["_id"]}, {'$push': {'diario': diariojson["diario"][0]}})
+            DT_REF = datetime.datetime.strptime(Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]["DT_COMPTC"], '%Y-%m-%d')
+            
+            diariojson["diario"].append({'DT_REFER': DT_REF, 'info': Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"][c]})
+           
+            cvmdb.update_one({'_id': diariojson["_id"]}, {'$push': {'diario': diariojson["diario"][0]}})
     
     #----------------- Dados balanco.
     arquivo='b'
@@ -225,23 +232,24 @@ for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in
             PercorreCSV()
             response_header,client=LoginCVM(wsdl,lg,pw)
     
-    Jcadas=OpenXML_JSON(result_func)
-    
-    # dado diario
-    Balanco={}
-    ## Dados do fundo.
-    for c in range(len(Jcadas["ROOT"]["INFORMES"]["BALANCETE"])):
-        if Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","") in Fundos.keys():
-            Balanco.update({Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""):{Jcadas["ROOT"]["INFORMES"]["BALANCETE"][0]["DT_COMPTC"]:{"contas": Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["LISTA_CONTAS"]["CONTA"],"PLANO_CONTABIL":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["PLANO_CONTABIL"],"TIPO_FDO":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["TIPO_FDO"],"Dia_publicado":Jcadas["ROOT"]["CABECALHO"]["DT_REFER"]}}})
-            Fundos[Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")]["Balanco"].update(Balanco[Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")])
+    if status == 1:
+        Jcadas=OpenXML_JSON(result_func)
+        
+        # dado diario
+        Balanco={}
+        ## Dados do fundo.
+        for c in range(len(Jcadas["ROOT"]["INFORMES"]["BALANCETE"])):
+            if Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","") in Fundos.keys():
+                Balanco.update({Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""):{Jcadas["ROOT"]["INFORMES"]["BALANCETE"][0]["DT_COMPTC"]:{"contas": Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["LISTA_CONTAS"]["CONTA"],"PLANO_CONTABIL":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["PLANO_CONTABIL"],"TIPO_FDO":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["TIPO_FDO"],"Dia_publicado":Jcadas["ROOT"]["CABECALHO"]["DT_REFER"]}}})
+                Fundos[Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")]["Balanco"].update(Balanco[Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")])
+                
+            balancojson= {}
+            balancojson={"_id":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""), "balanco":[]}
             
-        balancojson= {}
-        balancojson={"_id":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""), "balanco":[]}
-        
-        DT_REF = datetime.datetime.strptime(Jcadas["ROOT"]["CABECALHO"]["DT_REFER"], '%Y-%m-%d')
-        
-        balancojson["balanco"].append({'DT_REFER': DT_REF, 'info': {"PLANO_CONTABIL":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["PLANO_CONTABIL"],"TIPO_FDO":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["TIPO_FDO"],"Dia_publicado":Jcadas["ROOT"]["CABECALHO"]["DT_REFER"],"contas": Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["LISTA_CONTAS"]["CONTA"]}})
-        cvmdb.update_one({'_id': balancojson["_id"]}, {'$push': {'balanco': balancojson["balanco"][0]}})
+            DT_REF = datetime.datetime.strptime(Jcadas["ROOT"]["CABECALHO"]["DT_REFER"], '%Y-%m-%d')
+            
+            balancojson["balanco"].append({'DT_REFER': DT_REF, 'info': {"PLANO_CONTABIL":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["PLANO_CONTABIL"],"TIPO_FDO":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["TIPO_FDO"],"Dia_publicado":Jcadas["ROOT"]["CABECALHO"]["DT_REFER"],"contas": Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["LISTA_CONTAS"]["CONTA"]}})
+            cvmdb.update_one({'_id': balancojson["_id"]}, {'$push': {'balanco': balancojson["balanco"][0]}})
     
     ### ---------------------- Desenvolver coleta e carga de historico/ 
 
