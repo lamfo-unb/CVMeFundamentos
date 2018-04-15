@@ -61,7 +61,7 @@ def solicAutorizDownloadCadastroCVM(response_header,client,data):
         if exce[0] == 'Arquivo para download não encontrado para os parâmetros especificados':
             status = 2
             return(0,status)
-        elif exce[0] == 'Conversão do parâmetro strDtRefer para data não retorna dia útil':
+        elif exce[0] == 'Conversão do parâmetro strDtRefer para data não retorna dia útil.':
             status = 2
             return(0,status)
         elif exce[0] == 'Permissão negada. Por favor, efetue o login antes de acessar essa funcionalidade.':
