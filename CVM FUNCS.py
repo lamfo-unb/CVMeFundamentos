@@ -108,7 +108,7 @@ PercorreCSV()
 response_header,client=LoginCVM(wsdl,lg,pw)
 dia0=datetime.date.today()
 
-for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(2500,0) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
+for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(0,5800,-1) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
     status = 0
     while status == 0:
         result_func,status=solicAutorizDownloadCadastroCVM(response_header,client,data)
