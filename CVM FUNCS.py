@@ -109,7 +109,7 @@ response_header,client=LoginCVM(wsdl,lg,pw)
 
 for data in [((datetime.date.today() - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(2,2500) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
     status = 0
-    while status > 0:
+    while status == 0:
         result_func,status=solicAutorizDownloadCadastroCVM(response_header,client,data)
         if status == 0:
             print("teste")
