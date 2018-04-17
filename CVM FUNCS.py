@@ -112,7 +112,7 @@ cvmdb= db.cvm
 ### -------------------------   TESTES
 ### ----------------------- teste otimizacao 
 # -------------            cadastro de fundos 
-login_file = open('C:/Users/paulo/Documents/python-code/CVM/mycsvfileRene.csv', 'r')
+login_file = open('./mycsvfileRene.csv', 'r')
 logins = csv.reader(login_file)
 
 wsdl = 'http://sistemas.cvm.gov.br/webservices/Sistemas/SCW/CDocs/WsDownloadInfs.asmx?WSDL'
