@@ -122,7 +122,7 @@ PercorreCSV()
 response_header,client=LoginCVM(wsdl,lg,pw)
 dia0=datetime.date.today()
 
-for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(5800,0,-1) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
+for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(7,0,-1) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
     status = 0
     while status == 0:
         result_func,status=solicAutorizDownloadCadastroCVM(response_header,client,data)
@@ -241,7 +241,7 @@ for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in
             
             DT_REF = datetime.datetime.strptime(Jcadas["ROOT"]["CABECALHO"]["DT_REFER"], '%Y-%m-%d')
             
-            balancojson["balanco"].append({'DT_REFER': DT_REF, 'info': {"PLANO_CONTABIL":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["PLANO_CONTABIL"],"TIPO_FDO":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["TIPO_FDO"],"Dia_publicado":Jcadas["ROOT"]["CABECALHO"]["DT_REFER"],"contas": Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["LISTA_CONTAS"]["CONTA"]}})
+            balancojson["balanco"].append({'DT_REFER': DT_REF, 'info': {"PLANO_CONTABIL":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["PLANO_CONTABIL"],"TIPO_FDO":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["TIPO_FDO"],"Dia_publicado":Jcadas["ROOT"]["CABECALHO"]["DT_REFER"],"contas": [] if Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["LISTA_CONTAS"] is None else Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["LISTA_CONTAS"]}})
             cvmdb.update_one({'_id': balancojson["_id"]}, {'$push': {'balanco': balancojson["balanco"][0]}})
     
     ### ---------------------- Desenvolver coleta e carga de historico/ 
