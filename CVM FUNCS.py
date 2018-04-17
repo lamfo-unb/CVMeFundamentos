@@ -70,6 +70,9 @@ def solicAutorizDownloadCadastroCVM(response_header,client,data):
         elif exce[0] == 'Usuário atingiu o número máximo de autorizações para download permitido. Autorização não concedida.':
             status = 0
             return(0,status)
+        else:
+            status = 2
+            return(0,status)
     return(result_func.body.solicAutorizDownloadCadastroResult,status)
 
 ##------- Dados de informacoes diarias, atualizacao.
@@ -98,6 +101,9 @@ def solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo
             return(0,status)
         elif exce[0] == 'Usuário atingiu o número máximo de autorizações para download permitido. Autorização não concedida.':
             status = 0
+            return(0,status)
+        else:
+            status = 2
             return(0,status)
     return(result_func.body.solicAutorizDownloadArqEntregaPorDataResult,status)
 
