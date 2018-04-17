@@ -71,7 +71,7 @@ def solicAutorizDownloadCadastroCVM(response_header,client,data):
             status = 0
             return(0,status)
         else:
-            status = 2
+            status = 3
             return(0,status)
     return(result_func.body.solicAutorizDownloadCadastroResult,status)
 
@@ -103,7 +103,7 @@ def solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo
             status = 0
             return(0,status)
         else:
-            status = 2
+            status = 3
             return(0,status)
     return(result_func.body.solicAutorizDownloadArqEntregaPorDataResult,status)
 
@@ -128,7 +128,8 @@ PercorreCSV()
 response_header,client=LoginCVM(wsdl,lg,pw)
 dia0=datetime.date.today()
 
-for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(7,0,-1) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
+for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in range(5800,0,-1) if (6!= (datetime.date.today() - datetime.timedelta(days=x)).weekday() != 5)]:
+    print(data)
     status = 0
     while status == 0:
         result_func,status=solicAutorizDownloadCadastroCVM(response_header,client,data)
