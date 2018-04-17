@@ -134,12 +134,8 @@ for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in
     if status == 1:
         ## json formater, cadastro
         Jcadas=OpenXML_JSON(result_func)
-        Fundos={}
         ## Dados do fundo.
         for c in range(len(Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"])):
-           Fundos.update({Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]["CNPJ"].replace(".","").replace("/","").replace("-",""):{"Cadastro":{Jcadas["ROOT"]["CABECALHO"]["DT_REFER"]:Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]}}})
-           Fundos[Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]["CNPJ"].replace(".","").replace("/","").replace("-","")].update({"Diario":{},"Balanco":{}})
-           
            fundojson= {}
            fundojson={"_id":Jcadas["ROOT"]["PARTICIPANTES"]["CADASTRO"][c]["CNPJ"].replace(".","").replace("/","").replace("-","")}
            cvmdb.update_one({'_id': fundojson["_id"]}, {'$set':fundojson}, upsert=True)
@@ -211,8 +207,6 @@ for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in
             
     if status == 1:       
         Jcadas=OpenXML_JSON(result_func)
-        # dado diario
-        Diario={}
         ## Dados do fundo.
         for c in range(len(Jcadas["ROOT"]["INFORMES"]["INFORME_DIARIO"])):
   
@@ -231,7 +225,7 @@ for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in
     
     status = 0
     while status == 0:
-        result_func=solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo)
+        result_func,status=solicAutorizDownloadArqEntregaPorDataCVM(response_header,client,data,arquivo)
         if status == 0:
             PercorreCSV()
             response_header,client=LoginCVM(wsdl,lg,pw)
@@ -239,14 +233,8 @@ for data in [((dia0 - datetime.timedelta(days=x)).strftime('%Y-%m-%d')) for x in
     if status == 1:
         Jcadas=OpenXML_JSON(result_func)
         
-        # dado diario
-        Balanco={}
         ## Dados do fundo.
-        for c in range(len(Jcadas["ROOT"]["INFORMES"]["BALANCETE"])):
-            if Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","") in Fundos.keys():
-                Balanco.update({Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""):{Jcadas["ROOT"]["INFORMES"]["BALANCETE"][0]["DT_COMPTC"]:{"contas": Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["LISTA_CONTAS"]["CONTA"],"PLANO_CONTABIL":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["PLANO_CONTABIL"],"TIPO_FDO":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["TIPO_FDO"],"Dia_publicado":Jcadas["ROOT"]["CABECALHO"]["DT_REFER"]}}})
-                Fundos[Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")]["Balanco"].update(Balanco[Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-","")])
-                
+        for c in range(len(Jcadas["ROOT"]["INFORMES"]["BALANCETE"])):       
             balancojson= {}
             balancojson={"_id":Jcadas["ROOT"]["INFORMES"]["BALANCETE"][c]["CNPJ_FDO"].replace(".","").replace("/","").replace("-",""), "balanco":[]}
             cvmdb.update_one({'_id': balancojson["_id"]}, {'$set':balancojson}, upsert=True)
